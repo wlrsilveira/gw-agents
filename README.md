@@ -138,8 +138,9 @@ Só roda com o code-reviewer **APROVADO**. Faz:
 2. **Sem** trailer `Co-authored-by` e sem co-autoria Cursor/AI.
 3. `git push -u origin HEAD`.
 4. `gh pr create` com **base** = `development` (ou a base escolhida no estágio 0) e **título** no padrão da branch → PR, ex.: branch `T001-scaffold-laravel` → `[T-001] Scaffold Laravel`.
+5. Corpo do PR em português: `## RESUMO` e `## PLANO DE TESTE` (nunca Summary / Test plan).
 
-Devolve a URL do PR no relatório final da fábrica.
+**Não** devolve “commite e abra o PR manualmente” — a fábrica publica. Devolve a URL do PR no relatório final.
 
 ---
 

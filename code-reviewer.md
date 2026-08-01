@@ -142,8 +142,8 @@ Não aprove se existir qualquer Blocker.
 - Graphify: queries/affected usados (se houver)
 
 ### Pronto para o shipper
-Review **APROVADO**. O orchestrator deve invocar o `shipper` (commit, push e PR).
-Eu não faço commit, push nem abro PR.
+Review **APROVADO**. O orchestrator **deve** invocar o `shipper` agora (commit, push e PR). **Não** peça commit/PR manual ao usuário.
+Eu (code-reviewer) não faço commit, push nem abro PR — o `shipper` faz.
 ```
 
 ## Escalação (pare e devolva ao orchestrator)

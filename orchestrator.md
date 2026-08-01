@@ -92,11 +92,16 @@ Só depois do verifier verde. Suíte de regressão completa do sistema. Em caso 
 
 Só depois da regressão verde. Passe o **pacote de handoff** abaixo (inputs obrigatórios). Não invoque antes nem com um vago “revisa a branch”. Em caso de **BLOQUEADO**, máximo de **3** ciclos de correção → re-review; depois escale ao usuário com os Blockers em aberto.
 
-### 6. `shipper` — commit, push e PR
+### 6. `shipper` — commit, push e PR (obrigatório)
 
-Só depois do code-reviewer **APROVADO**. Invocar o `shipper` com o handoff abaixo. **Não** peça ao usuário para commit/push/PR manual — a fábrica entrega no remoto.
+Só depois do code-reviewer **APROVADO**. **Sempre** invoque o `shipper` com o handoff abaixo e **aguarde** commit + push + PR. O pipeline **não termina** no review.
 
-Se o `shipper` falhar (auth `gh`, push rejeitado, secrets, etc.), escale ao usuário com a evidência; não contorne com force push.
+- **Proibido** dizer ao usuário que pode “commitar e abrir o PR manualmente”.
+- **Proibido** pular o `shipper` ou tratar a entrega remota como passo humano.
+- Pedido de fábrica (“faz aí” / “roda a fábrica”) **já autoriza** o `shipper` a commit/push/PR (sem pedir de novo).
+- Corpo do PR: seções `## RESUMO` e `## PLANO DE TESTE` (português).
+
+Se o `shipper` falhar (auth `gh`, push rejeitado, secrets, etc.), escale ao usuário com a evidência; não contorne com force push e **não** substitua por handoff manual genérico sem explicar o erro.
 
 ## Handoff obrigatório → `code-reviewer`
 
@@ -122,6 +127,8 @@ Inclua **todos** estes itens:
 - **Título do PR** no padrão `[T-001] Scaffold Laravel` (já derivado no estágio 0)
 - Mensagem de commit sugerida (opcional; pode espelhar o título do PR)
 - Instrução explícita: commit com o usuário git local, **sem** `Co-authored-by` / co-autoria Cursor
+- Instrução explícita: corpo do PR com `## RESUMO` e `## PLANO DE TESTE` (nunca Summary/Test plan)
+- Instrução explícita: **executar** commit/push/PR — não pedir ao usuário
 
 ## Regras de delegação
 
@@ -130,7 +137,7 @@ Inclua **todos** estes itens:
 - O handoff ao `code-reviewer` e ao `shipper` devem seguir as seções **Handoff obrigatório** respectivas.
 - Em caso de **BLOQUEADO** no code-reviewer: despache o(s) dono(s) citados; depois verifier → (regression se necessário) → code-reviewer de novo. Não peça ao usuário para “revisar o review”.
 - **Teto de ciclos por gate:** verifier, regression e code-reviewer têm, cada um, no máximo **3** ciclos de correção. Ao estourar qualquer um deles, pare e escale ao usuário com a evidência acumulada — não siga girando.
-- Mantenha o usuário fora do meio: não peça que ele rode testes ou “veja se funcionou”. Os especialistas validam.
+- Mantenha o usuário fora do meio: não peça que ele rode testes, “veja se funcionou”, nem commit/push/PR. Os especialistas validam; o `shipper` publica.
 - Escale apenas por ambiguidade de produto, credenciais/env faltando, branch base indefinida (sem `development`), falha do `shipper`, ou após o limite de ciclos de correção.
 
 ## Formato do relatório final
