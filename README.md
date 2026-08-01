@@ -1,15 +1,15 @@
 # Fábrica de Software (Cursor Subagents)
 
-Pipeline autônomo de entrega de features: da SDD ao "pronto para commitar", sem colocar o usuário no meio do processo.
+Pipeline autônomo de entrega de features: da SDD ao PR aberto no remoto, sem colocar o usuário no meio do processo.
 
-O usuário entra **duas vezes**: no início (entrega a SDD e diz "roda a fábrica") e no fim (commita e abre o PR manualmente). Entre esses dois pontos, os especialistas se validam entre si.
+O usuário entra **duas vezes**: no início (entrega a SDD e diz "roda a fábrica"; e, se não houver branch `development`, indica a base) e no fim (recebe a URL do PR). Entre esses pontos, os especialistas se validam entre si e o `shipper` publica.
 
 ---
 
 ## Sumário
 
 - [Como acionar](#como-acionar)
-- [Os 7 agentes](#os-7-agentes)
+- [Os 8 agentes](#os-8-agentes)
 - [O pipeline passo a passo](#o-pipeline-passo-a-passo)
 - [Regras que governam a fábrica](#regras-que-governam-a-fábrica)
 - [Pré-requisitos do projeto](#pré-requisitos-do-projeto)
@@ -32,7 +32,7 @@ O `orchestrator` assume, e você não é chamado de volta até o fim (ou até um
 
 ---
 
-## Os 7 agentes
+## Os 8 agentes
 
 | Agente | Papel | Edita produção? | Quando roda |
 |--------|-------|-----------------|-------------|
@@ -43,12 +43,13 @@ O `orchestrator` assume, e você não é chamado de volta até o fim (ou até um
 | `verifier` | Roda os testes **da feature** + QA contra os aceites | Não | Estágio 3 |
 | `regression` | Roda a suíte **completa** do sistema | Não | Estágio 4 |
 | `code-reviewer` | Review final do diff contra SDD, arquitetura e segurança | Não (`readonly: true`) | Estágio 5 |
+| `shipper` | Commit (sem co-autoria Cursor), push e abre o PR no remoto | Só git/PR | Estágio 6 |
 
 ---
 
 ## O pipeline passo a passo
 
-### 0. Preparação (`orchestrator`)
+### 0. Preparação + branch (`orchestrator`)
 
 Antes de delegar qualquer coisa, o orquestrador confirma:
 
@@ -56,6 +57,13 @@ Antes de delegar qualquer coisa, o orquestrador confirma:
 - O `AGENTS.md` do projeto documenta como rodar os testes de backend, frontend e regressão.
 
 Se faltar critério observável ou comando de teste, ele **pergunta uma única vez** e para. Não adivinha comportamento de produto.
+
+Em seguida configura o git:
+
+1. Se existir branch `development` (local ou `origin`) → checkout nela (e atualiza do remoto quando fizer sentido).
+2. Se **não** existir → **pergunta qual é a branch base** e só continua após a resposta.
+3. Cria e faz checkout da branch com o **slug da spec** (ex. `specs/T001-scaffold-laravel.md` → branch `T001-scaffold-laravel`).
+4. Deriva o **título do PR** no padrão `[T-001] Scaffold Laravel` (código com hífen + Title Case do resto do slug) e guarda base + branch + título para o `shipper`.
 
 ### 1. `test-writer` — os testes viram a fonte da verdade
 
@@ -122,15 +130,16 @@ O que ele checa no que o diff tocou: edge fino e regra na camada certa; modo cor
 
 Severidades: **Blocker** (segurança, perda de dados, comportamento quebrado vs SDD, violação grave de boundary) → rejeita e roteia ao dono. **Should fix** → recomendação forte. **Nit** → nunca vira Blocker.
 
-### 6. Handoff humano
+### 6. `shipper` — commit, push e PR
 
-Com o review **APROVADO**, a fábrica avisa que está tudo verde e devolve para você:
+Só roda com o code-reviewer **APROVADO**. Faz:
 
-> Pode commitar manualmente e abrir o PR manualmente.
+1. Commit na branch da tarefa com a identidade git **já configurada do usuário**.
+2. **Sem** trailer `Co-authored-by` e sem co-autoria Cursor/AI.
+3. `git push -u origin HEAD`.
+4. `gh pr create` com **base** = `development` (ou a base escolhida no estágio 0) e **título** no padrão da branch → PR, ex.: branch `T001-scaffold-laravel` → `[T-001] Scaffold Laravel`.
 
-**Nenhum agente commita, dá push ou abre PR** — salvo pedido explícito seu.
-
-Se o review **BLOQUEAR**, o orquestrador despacha o dono, roda o verifier de novo (e a regressão, se a correção puder afetar a saúde do sistema) e só então reenvia ao reviewer.
+Devolve a URL do PR no relatório final da fábrica.
 
 ---
 
@@ -181,6 +190,8 @@ Para a fábrica rodar sem travar no estágio 0:
 - [ ] **`graphify-out/graph.json`** gerado (opcional, mas é o que torna a exploração barata).
 - [ ] Ferramentas de qualidade documentadas se existirem (Pint, PHPStan/Larastan, lint, typecheck).
 - [ ] Env/credenciais que a suíte precisa — a fábrica **escala** em vez de marcar verde sem rodar.
+- [ ] **`gh` autenticado** no remoto (para o `shipper` abrir o PR).
+- [ ] Branch **`development`** no repo (senão o orquestrador pergunta a base uma vez).
 
 ---
 
@@ -194,7 +205,7 @@ Para a fábrica rodar sem travar no estágio 0:
 | Ciclo code-reviewer BLOQUEADO → dono → re-review | 3 ciclos, depois escala com os Blockers em aberto |
 | Reexecução de teste suspeito de flake | 3 execuções, depois roteia ao `test-writer` |
 
-A fábrica só interrompe e chama você por: **ambiguidade de produto**, **env/credenciais faltando**, ou **estouro do limite de ciclos**.
+A fábrica só interrompe e chama você por: **ambiguidade de produto**, **env/credenciais faltando**, **branch base indefinida** (sem `development`), **falha do shipper** (auth/`gh`/push), ou **estouro do limite de ciclos**.
 
 ---
 
@@ -208,6 +219,7 @@ Cada agente também funciona isolado, sem o pipeline completo:
 - `/verifier` — validar o estado atual de uma feature contra a spec
 - `/regression` — checar a saúde do sistema antes de um release
 - `/code-reviewer` — review de um diff (exige gates verdes; recusa review parcial)
+- `/shipper` — commit/push/PR após review APROVADO (exige handoff completo)
 
 Para edições de um arquivo só, não use o `orchestrator` — o overhead não compensa.
 
@@ -217,6 +229,6 @@ Para edições de um arquivo só, não use o `orchestrator` — o overhead não 
 
 - **A fábrica não escreve a SDD.** Ela consome uma spec pronta. Sem critério de aceite testável, ela para no estágio 0.
 - **Depende de `AGENTS.md`.** Se o projeto não documenta como rodar os testes, todos os gates escalam em vez de adivinhar comandos.
-- **Não commita nem abre PR.** Por decisão de design — o passo final é sempre humano.
+- **O `shipper` publica no remoto** só após code-reviewer APROVADO; commit sem co-autoria Cursor.
 - **Backend é Laravel-only.** Outros backends (Node, Python, Go) não têm agente implementador dedicado.
 - **QA de UI depende de ferramenta de browser/app.** Sem ela, aceites UI-facing ficam `bloqueado`, nunca `pass`.
