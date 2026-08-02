@@ -50,7 +50,7 @@ Sem SDD + comando de teste acionável → **escalar**; não inventar comportamen
    Se o projeto já tem layout, **seguir o projeto** — não impor skeleton novo nem forçar API Resource num app Blade.
 2. **Espelhar padrões** — Antes de criar arquivos, espelhar um vizinho do mesmo módulo e do mesmo modo (Controller+Resource **ou** Controller+View/Livewire/Inertia), inclusive: Policy/`authorize`, **grupos de rota/middleware**, Form Request e naming.
 3. **Implementar por camadas** — Preferir **de dentro para fora**: Domain → Application/Service (ou Action do repo) → Infrastructure → Interface/edge. Só stubar o edge antes se o teste vermelho exigir o contrato HTTP/UI. Controllers e Livewire ficam finos — orquestração no edge, regra no application/domain. Eloquent model = persistência/relações/casts — **não** use case.
-4. **Vermelho → verde** — Rodar os testes do `test-writer` (ou o comando da falha do verifier); corrigir só código de produção (seam mínima só se já for padrão do projeto). Máx. **3** tentativas na mesma falha; depois escalar. Não “melhorar” além do escopo depois de verde + checklist.
+4. **Vermelho → verde** — Rodar os testes do `test-writer` (ou o comando da falha do verifier); corrigir só código de produção (seam mínima só se já for padrão do projeto). Máx. **3** tentativas na mesma falha; depois escalar. Não "melhorar" além do escopo depois de verde + checklist.
 5. **Autochecagem** — Passar no checklist abaixo; se `AGENTS.md` documentar Pint / PHPStan / Larastan (ou equivalente), rodar no escopo tocado antes de declarar done.
 6. **Relatório** — Devolver o template de entrega ao orchestrator. Em trabalho paralelo com `frontend`, documentar o contrato no relatório mesmo que a SPA ainda não consuma.
 
@@ -64,7 +64,7 @@ Sem SDD + comando de teste acionável → **escalar**; não inventar comportamen
 
 ## Arquitetura (obrigatória)
 
-- **Edge fino:** Controllers / Livewire components só recebem input, autorizam, chamam application/service e devolvem response (JSON, redirect, view, Inertia).
+- **Edge fino (regra de ouro):** O controller **só** faz três coisas: (1) extrair input do request, (2) chamar **um** método de serviço ou action, (3) devolver response (JSON, redirect, view, Inertia). **Qualquer coisa além disso é violação.** Autorização via Policy/Gate fica no `authorize()` do Form Request — nunca `abort_unless`, `Gate::check` ou `$this->authorize` soltos no controller.
 - Camadas alinhadas ao DDD / hexagonal **já presente** no projeto:
   - **Domain:** entities, value objects, domain services, domain exceptions
   - **Application / Services / Actions:** use cases, orquestração, transactions — **só o estilo que o repo já usa**
@@ -73,32 +73,111 @@ Sem SDD + comando de teste acionável → **escalar**; não inventar comportamen
     - API → API Resources / transformers
     - Monolito → Blade views, View Models, Livewire, Inertia props/páginas **no padrão do repo**
 - Validação via Form Request (ou equivalente do projeto: Livewire rules, Form Objects, etc.).
-- **AuthZ:** Policy/Gate no mesmo lugar do módulo vizinho (`authorize()` no Form Request, `$this->authorize` / `Gate` no controller, Policy no model, ou hooks Livewire). Em Livewire, autorizar `mount` **e** actions que mutam.
+- **AuthZ:** Toda autorização via Policy/Gate fica no método `authorize()` do Form Request — este é o local canônico. Nunca use `abort_unless`, `Gate::check` ou `$this->authorize` dentro do controller ou do serviço. Em Livewire, autorizar no `mount` **e** nas actions que mutam (via `$this->authorize` no próprio Livewire component, pois não há Form Request).
 - Respeitar boundaries de módulo e convenções de pasta do repo.
 - Boas práticas Laravel: DI, Policies/Gates explícitos, sem vazar secrets, eager-load para evitar N+1 em listagens.
 - **Contratos:** mudança de shape JSON, props Inertia ou campos de formulário/view **só** se SDD/testes pedirem; senão escalar ao orchestrator (pode impactar `frontend` ou outros consumidores).
 
+### O que pertence ao Serviço/Action — nunca ao Controller
+
+Os itens abaixo são **obrigatoriamente** implementados no serviço (ou Action/use case do módulo). Se você escrever qualquer um deles dentro de um método de controller, mova para o serviço antes de prosseguir:
+
+- Qualquer chamada Eloquent: `Model::query()`, `->get()`, `->save()`, `->update()`, `->delete()`, `->find()`, etc.
+- Filtragem de scope / autorização baseada em dados (ex.: `whereIn('id', $scope)`, loop verificando IDs contra lista de acesso)
+- `DB::transaction(...)` ou qualquer controle de transação
+- Mapeamento / transformação de coleções para arrays ou DTOs de response
+- Regras de validação de negócio (ex.: validar intervalo de dias, consistência entre campos)
+- Qualquer `if`/`foreach` que dependa do estado do domínio ou de registros do banco
+
+**Exemplo CORRETO:**
+
+```php
+// Form Request — autorização aqui, nunca no controller
+class UpdateExpirationRequest extends FormRequest
+{
+    public function authorize(): bool
+    {
+        $optics = $this->route('optics');
+        return $this->user('admin')?->can('manageExpiration', $optics) ?? false;
+    }
+
+    public function rules(): array { ... }
+}
+
+// Controller — só extrai input, chama serviço, devolve response
+public function update(UpdateExpirationRequest $request, Optics $optics): RedirectResponse
+{
+    $this->expirationService->update($optics, $request->validated());
+    return redirect()->back()->with('success', 'Expiração atualizada com sucesso.');
+}
+
+public function bulk(BulkExpirationRequest $request): JsonResponse
+{
+    $this->expirationService->bulkUpdate($request->validated(), $request->attributes->get('scope'));
+    return response()->json(['message' => 'Expiração atualizada em lote com sucesso.']);
+}
+```
+
+**Exemplo PROIBIDO:**
+
+```php
+// ERRADO: autorização solta no controller
+public function update(UpdateExpirationRequest $request, Optics $optics): RedirectResponse
+{
+    abort_unless(Gate::forUser($request->user('admin'))->check('manageExpiration', $optics), 403);
+    // ...
+}
+
+// ERRADO: queries Eloquent, DB::transaction, mapeamento e lógica de negócio no controller
+public function update(UpdateExpirationRequest $request, Optics $optics): RedirectResponse
+{
+    $days = $request->input('expiration_days') !== '' ? (int) $request->input('expiration_days') : null;
+    $this->policyService->validate($days);   // validação deveria ser encapsulada no serviço
+    $optics->expiration_days = $days;        // manipulação de model no controller
+    $optics->save();                         // persistência no controller
+    return redirect()->back()->with('success', '...');
+}
+
+public function bulk(BulkExpirationRequest $request): JsonResponse
+{
+    $scope = $request->attributes->get('scope');
+    foreach ($opticsIds as $id) {            // loop de autorização de dados no controller
+        if (!in_array($id, $scope, true)) { abort(403); }
+    }
+    DB::transaction(function () use (...) {  // transação no controller
+        Optics::whereIn('id', $opticsIds)->update([...]);
+    });
+    return response()->json([...]);
+}
+```
+
 ### PROIBIDO
 
 - Regra de negócio, orquestração multi-model ou coreografia de DB no Controller, no `render` gorduroso do Livewire, ou no Eloquent Model
-- Validação “solta” no controller quando o projeto usa Form Request (ou o equivalente do modo)
+- Chamadas Eloquent diretas (`query()`, `save()`, `update()`, `delete()`, `whereIn()`, etc.) dentro de método de controller
+- `DB::transaction` ou controle de transação dentro do controller
+- Loop de verificação de permissão/scope iterando IDs no controller — lógica de autorização baseada em dados vai no serviço
+- Mapeamento de coleções para arrays de response dentro do controller — vai no serviço ou em um Resource/ViewModel
+- Validação "solta" no controller quando o projeto usa Form Request (ou o equivalente do modo)
 - Criar, apagar, pular ou enfraquecer testes da feature para ficar verde — conflito teste↔SDD → orchestrator / `test-writer`
 - Inventar campos de request/response, props Inertia ou contratos de formulário/view fora da SDD / testes
-- Inventar camada Repository / DTO / Action / “DDD completo” se o módulo não usa — espelhar o vizinho
+- Inventar camada Repository / DTO / Action / "DDD completo" se o módulo não usa — espelhar o vizinho
 - Editar migration **já existente** que possa ter sido aplicada — criar migration nova
 - Secrets hardcoded; raw SQL inseguro; mass-assignment sem `$fillable`/`$guarded` consciente
 - Criar árvore DDD paralela se o repo já tem outro boundary
 - Forçar estilo API (Resource/JSON) num monolito Blade/Livewire — ou o inverso — sem a SDD pedir
-- Refatorar módulos fora do escopo, “melhorar” config global, ou alterar versão Laravel/deps sem a SDD pedir
+- Refatorar módulos fora do escopo, "melhorar" config global, ou alterar versão Laravel/deps sem a SDD pedir
 
 ## Checklist Laravel (só o que a feature tocar)
 
 Compartilhado:
 
-- [ ] Form Request (ou equivalente) + Policy/Gate em mutação ou leitura sensível (no ponto certo do módulo)
+- [ ] Controller com no máximo 4 responsabilidades: extrair input, autorizar, chamar serviço, devolver response
+- [ ] Nenhuma chamada Eloquent ou `DB::transaction` diretamente no controller
+- [ ] Autorização via `authorize()` no Form Request — nenhum `abort_unless`, `Gate::check` ou `$this->authorize` no controller ou no serviço
 - [ ] Rotas no grupo/middleware certo (espelhar vizinho: `web` / `api` / `auth` / Sanctum / etc.)
 - [ ] Migration **nova** + factory/seeder mínimos se houver persistência nova (FK/index quando o vizinho faz)
-- [ ] `DB::transaction` (ou equivalente) em orquestrações multi-write
+- [ ] `DB::transaction` (ou equivalente) em orquestrações multi-write — **no serviço**
 - [ ] Eager-load em listagens (anti-N+1)
 - [ ] Jobs/Events só se a SDD ou o padrão do repo exigir
 - [ ] Exceções de domínio → resposta consistente com o projeto (HTTP JSON, redirect+flash, etc.)
@@ -121,7 +200,7 @@ Se **monolito** (Blade / Livewire / Inertia):
 
 - Testes do **`test-writer`** são a fonte da verdade executável. Implemente até passarem.
 - Você **não** é dono dos testes da feature: não reescreva asserções nem adicione suíte paralela. Seam mínima em produção só se o projeto já usa esse padrão.
-- Conflito teste vs SDD escrita → **pare e reporte** ao orchestrator; não “conserte” o teste sozinho.
+- Conflito teste vs SDD escrita → **pare e reporte** ao orchestrator; não "conserte" o teste sozinho.
 - Após falha do **`verifier`**:
   1. Ler o relatório (critério, comando, esperado vs atual, evidência)
   2. Corrigir o mínimo no código de produção
