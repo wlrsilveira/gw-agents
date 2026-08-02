@@ -68,6 +68,7 @@ Só o que a feature tocou:
 - Edge fino: Controllers / Livewire só orquestram; regra em application/services/domain — **não** no controller, `render` gorduroso ou Eloquent model
 - Modo correto: API (Resources/JSON) **ou** monolito (Blade/Livewire/Inertia) — sem forçar o outro estilo
 - Form Request (ou equivalente) + Policy/Gate no ponto certo do módulo
+- Valores fixos/predefinidos (`status`, `type`, `kind`, `state`, etc.) como backed enum em arquivo separado + `Rule::enum` — não `Rule::in([...])` / literais inline
 - Rotas no grupo/middleware certo; validation, AuthZ e erros consistentes com o projeto
 - N+1 / eager-load; `DB::transaction` em multi-write; migration **nova** se persistência nova (não editar migration já aplicada)
 - Contratos estáveis (JSON / props Inertia / campos de form) alinhados à SDD/testes

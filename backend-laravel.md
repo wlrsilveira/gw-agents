@@ -73,10 +73,41 @@ Sem SDD + comando de teste acionável → **escalar**; não inventar comportamen
     - API → API Resources / transformers
     - Monolito → Blade views, View Models, Livewire, Inertia props/páginas **no padrão do repo**
 - Validação via Form Request (ou equivalente do projeto: Livewire rules, Form Objects, etc.).
+- **Enums para valores fixos/predefinidos (obrigatório):** Qualquer conjunto **fechado e pré-definido** de valores — `status`, `type`, `kind`, `state`, `role`, `channel`, `priority`, `mode`, flags categóricas, etc. — **não** fica como string solta, array de literais, nem `Rule::in(['a', 'b', ...])` / `in_array(..., ['a', 'b'])` inline. Crie um **PHP backed enum em arquivo separado** (um enum por conceito; espelhar pasta do repo: `app/Enums/`, `app/Domain/.../Enums/`, etc.), com **um case por valor**. Valide com `Rule::enum(NomeDoEnum::class)`. Cast no Eloquent model quando o campo for persistido. Reutilize o **mesmo** enum em Form Request, service, Policy, Resource/view, factories e testes — **uma** fonte da verdade. Exceção só se o repo já modelar aquele conceito de outro jeito canônico (ex.: tabela de lookup referenciada por FK) — aí espelhar o vizinho, não inventar literais.
 - **AuthZ:** Toda autorização via Policy/Gate fica no método `authorize()` do Form Request — este é o local canônico. Nunca use `abort_unless`, `Gate::check` ou `$this->authorize` dentro do controller ou do serviço. Em Livewire, autorizar no `mount` **e** nas actions que mutam (via `$this->authorize` no próprio Livewire component, pois não há Form Request).
 - Respeitar boundaries de módulo e convenções de pasta do repo.
 - Boas práticas Laravel: DI, Policies/Gates explícitos, sem vazar secrets, eager-load para evitar N+1 em listagens.
 - **Contratos:** mudança de shape JSON, props Inertia ou campos de formulário/view **só** se SDD/testes pedirem; senão escalar ao orchestrator (pode impactar `frontend` ou outros consumidores).
+
+**Exemplo — valores fixos como Enum (não literais inline):**
+
+```php
+// app/Enums/CampaignStatus.php — arquivo dedicado, um case por valor
+namespace App\Enums;
+
+enum CampaignStatus: string
+{
+    case Draft = 'draft';
+    case Active = 'active';
+    case Inactive = 'inactive';
+}
+
+// Form Request — Rule::enum, nunca Rule::in([...literais...])
+'status' => ['required', Rule::enum(CampaignStatus::class)],
+
+// Model — cast para o enum
+protected function casts(): array
+{
+    return [
+        'status' => CampaignStatus::class,
+    ];
+}
+
+// ERRADO — conjunto fechado como strings soltas
+'status' => ['required', Rule::in(['draft', 'active', 'inactive'])],
+'type' => ['required', 'in:percent,fixed'],
+if ($mode === 'combo') { ... } // quando 'combo'|'item' é conjunto fixo → Enum
+```
 
 ### O que pertence ao Serviço/Action — nunca ao Controller
 
@@ -167,6 +198,7 @@ public function bulk(BulkExpirationRequest $request): JsonResponse
 - Criar árvore DDD paralela se o repo já tem outro boundary
 - Forçar estilo API (Resource/JSON) num monolito Blade/Livewire — ou o inverso — sem a SDD pedir
 - Refatorar módulos fora do escopo, "melhorar" config global, ou alterar versão Laravel/deps sem a SDD pedir
+- Representar conjunto fechado de valores (`status`, `type`, `kind`, `state`, `role`, etc.) com strings/array/`Rule::in([...])` inline — use backed enum em arquivo separado + `Rule::enum`
 
 ## Checklist Laravel (só o que a feature tocar)
 
@@ -175,6 +207,7 @@ Compartilhado:
 - [ ] Controller com no máximo 4 responsabilidades: extrair input, autorizar, chamar serviço, devolver response
 - [ ] Nenhuma chamada Eloquent ou `DB::transaction` diretamente no controller
 - [ ] Autorização via `authorize()` no Form Request — nenhum `abort_unless`, `Gate::check` ou `$this->authorize` no controller ou no serviço
+- [ ] Valores fixos/predefinidos (status, type, kind, state, role, etc.) → backed enum em arquivo separado + `Rule::enum` + cast no model se persistido
 - [ ] Rotas no grupo/middleware certo (espelhar vizinho: `web` / `api` / `auth` / Sanctum / etc.)
 - [ ] Migration **nova** + factory/seeder mínimos se houver persistência nova (FK/index quando o vizinho faz)
 - [ ] `DB::transaction` (ou equivalente) em orquestrações multi-write — **no serviço**
