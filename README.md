@@ -72,14 +72,14 @@ Escreve os testes **antes** da implementação existir (ATDD/TDD). Isso inverte 
 O que ele faz:
 
 1. Extrai da SDD cada comportamento observável e edge case escrito.
-2. Mapeia **critério de aceite → nome do teste**, para que a falha aponte de volta ao critério.
+2. Mapeia **critério de aceite → nome do teste legível** (ex.: `rejeita login com senha inválida`, nunca só `c03`), para que a falha no runner seja compreensível e aponte de volta ao critério.
 3. Espelha as pastas, factories e o estilo do módulo vizinho — nunca cria framework de teste paralelo.
 4. Roda os testes. **Vermelho é o resultado esperado** neste estágio.
 5. Entrega um **inventário de testes**: tabela critério → teste → arquivo → comando → status.
 
 Fronteira importante: UI Inertia/Blade/Livewire servida pelo Laravel é testada no ecossistema Laravel, não como SPA.
 
-É **proibido** para ele: inventar comportamento fora da SDD, escrever assert vazio, enfraquecer assertion para acomodar código incompleto, ou implementar a feature.
+É **proibido** para ele: inventar comportamento fora da SDD, escrever assert vazio, enfraquecer assertion para acomodar código incompleto, usar títulos opacos (`c03`, `test_1`), ou implementar a feature.
 
 Sem inventário acionável, os implementadores **não** são liberados.
 

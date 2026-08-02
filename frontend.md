@@ -108,6 +108,8 @@ Sem SDD + comando de teste acionável → **escalar**; não inventar comportamen
 
 - Seguir Vue 3 + Composition **ou** Options, Nuxt, Vue Router, Pinia/Vuex — **só o que o repo usa**.
 - SFCs focados; orquestração em composables/stores do módulo vizinho — templates sem regra de negócio.
+- **Não repetir markup/lógica:** extrair UI e comportamentos repetidos em componentes e composables reutilizáveis (props/emits claros). Copiar-colar o mesmo bloco em várias views/pages é **proibido** — reutilizar ou criar o componente compartilhado no padrão de pastas do vizinho.
+- Antes de duplicar: procurar componente/composable existente no módulo (e no design system do app, se houver); só criar novo se não couber no existente.
 - Pastas (`components/`, `composables/`, `stores/`, `pages/`/`views/`) e estilo (scoped / Tailwind) do vizinho.
 - Tipagem (`defineProps` / `defineEmits` / TS) quando o projeto já tipa.
 
@@ -140,6 +142,7 @@ Se **React**:
 Se **Vue**:
 
 - [ ] SFC fino; lógica em composable/store no padrão do módulo
+- [ ] Sem markup/lógica duplicada — componentes/composables reutilizáveis; reusou existente quando cabia
 - [ ] Router / Nuxt pages / Pinia-Vuex alinhados ao vizinho (sem trocar paradigma)
 
 Se **Flutter**:

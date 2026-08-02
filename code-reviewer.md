@@ -86,6 +86,7 @@ Só o que a feature tocou:
 ### Transversal
 
 - Testes para comportamento novo parecem intencionais (não vacuamente true / asserts fracos)
+- Títulos/descrições de caso (`it`/`test`/método) **legíveis**: descrevem o comportamento; rejeitar nomes opacos sozinhos (`c03`, `AC-3`, `test_1`, `works`) — ID da SDD só como prefixo opcional
 - Naming, estrutura, dead code no diff
 - Critérios de aceite da SDD parecem cobertos
 - Regras do projeto / `AGENTS.md` / user rules aplicáveis respeitadas no escopo

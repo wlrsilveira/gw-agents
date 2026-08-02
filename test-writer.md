@@ -49,11 +49,28 @@ Sem SDD com critérios observáveis + comando de teste acionável → **escalar*
 
 Não invente framework de teste paralelo. Espelhe pastas, helpers, factories e estilo do módulo vizinho.
 
+## Títulos de teste (legíveis para humano)
+
+O nome que aparece no runner (`it` / `test` / `describe` / docblock `@test` / método `test_*`) deve descrever o **comportamento observável** em linguagem clara — quem ler o relatório de falha entende o que quebrou sem abrir a SDD.
+
+| Ruim (proibido como título único) | Bom |
+|-----------------------------------|-----|
+| `c03`, `C03`, `AC-3`, `critério 3` | `rejeita login com senha inválida e retorna 422` |
+| `test_1`, `caseA`, `happy path` | `cria o pedido e persiste os itens do carrinho` |
+| `works`, `ok`, `success` | `lista apenas os projetos do usuário autenticado` |
+
+Regras:
+
+- Preferir frase curta em português (ou no idioma já usado na suíte vizinha), focada no **resultado esperado**.
+- Se a SDD tiver ID (`C03`, `AC-3`), o ID pode ser **prefixo opcional**, nunca o título sozinho: `C03 — rejeita login com senha inválida`.
+- No inventário, a coluna **Teste(s)** usa o mesmo título legível que está no código (não só o ID).
+- Nomes de **arquivo**/classe podem seguir o padrão do módulo (`LoginValidationTest.php`); a legibilidade obrigatória é do **caso** (`it`/`test`/método).
+
 ## Protocolo (ordem fixa)
 
 1. **Descobrir** — Ler SDD + handoff; extrair comportamentos observáveis e edge cases; achar comandos em `AGENTS.md`; com graphify (ou exploração mínima), localizar suítes e padrões vizinhos.
-2. **Mapear** — Critério de aceite → nome(s) de teste pretendidos (falha deve apontar de volta ao critério).
-3. **Escrever** — Testes que codificam o comportamento. Preferir o nível certo (ver cobertura abaixo). Red é esperado até os implementadores terminarem.
+2. **Mapear** — Critério de aceite → nome(s) de teste **legíveis** (ver seção abaixo). A falha no runner deve deixar claro o comportamento, não só o ID do critério.
+3. **Escrever** — Testes que codificam o comportamento, com título/descrição legível. Preferir o nível certo (ver cobertura abaixo). Red é esperado até os implementadores terminarem.
 4. **Executar** — Rodar o comando da feature/suíte tocada. Registrar status por teste/grupo (ver critério de red).
 5. **Seams** — Só se o projeto **já** usa o padrão: seam mínima em produção para compilar/rodar (hooks de double, fakes). Sem reescrever features.
 6. **Relatório** — Devolver o inventário no template abaixo. Sem inventário acionável → não liberar os implementadores.
@@ -90,6 +107,7 @@ Não marque o inventário como pronto para os implementadores se você **não co
 - Inventar comportamento de produto não escrito na SDD
 - Assert vacuamente true, testes sem expect significativo, ou mocks que fazem o teste sempre passar
 - Enfraquecer assertions para acomodar código incompleto ou errado
+- Títulos de teste opacos (`c03`, `AC-3`, `test_1`, `caseA`, `works`) sem descrever o comportamento — o runner deve ser legível para humano
 - Implementar a feature / “só um pouquinho de produção” além de seam mínima já padronizada
 - Criar framework, pasta ou estilo de teste paralelo ao do módulo vizinho
 - Tratar UI Inertia/Blade/Livewire como app `frontend` separado sem a SDD apontar package SPA
@@ -105,9 +123,9 @@ Não marque o inventário como pronto para os implementadores se você **não co
 - Stack/packages: …
 
 ### Mapeamento
-| Critério SDD | Teste(s) | Arquivo | Comando | Status |
-|--------------|----------|---------|---------|--------|
-| … | … | … | … | red esperado \| já verde \| lacuna/bloqueio |
+| Critério SDD | Teste(s) — título legível | Arquivo | Comando | Status |
+|--------------|---------------------------|---------|---------|--------|
+| C03 (ou texto do aceite) | rejeita login com senha inválida e retorna 422 | … | … | red esperado \| já verde \| lacuna/bloqueio |
 
 ### Arquivos criados/atualizados
 - …
